@@ -45,32 +45,43 @@ class My3DPlot():
     speed = {"X":np.array([]),"Y":np.array([]),"Z":np.array([])}
     windowSize = 9
     polyOrder = 2
-
+    fig=plt.figure()
+    ax = fig.gca(projection='3d')
+    
     def smooth_callback(self, data):
         if len(data.tracks):
             if self.time.size == 0:
                 self.first_stamp = data.header.stamp
+            elif self.time.size == 2:
+                self.time = np.delete(self.time,0,0)
+                self.speed["X"] = np.delete(self.speed["X"],0,0)
+                self.speed["Y"] = np.delete(self.speed["Y"],0,0)
             dr = (data.header.stamp - self.first_stamp).to_sec()
             self.time = np.append(self.time,dr)
             self.speed["X"] = np.append(self.speed["X"],data.tracks[0].pose.pose.position.x)
             self.speed["Y"] = np.append(self.speed["Y"],data.tracks[0].pose.pose.position.y)
-            self.hasdata = True
+            #self.ax.clear()
+            self.ax.plot(xs=self.speed["X"],
+                         ys=self.speed["Y"],
+                        zs=self.time,label='movement curve')      
+            #self.hasdata = True
 
     def smooth_optitrack(self):
         rospy.init_node('smooth_optitrack', anonymous=True)
         rospy.Subscriber("optitrack_person/tracked_persons", TrackedHumans, self.smooth_callback)
-        fig=plt.figure()
-        ax = fig.gca(projection='3d')
-        varNull = raw_input('Press enter to continue..')
+        plt.ion()
+        self.ax.set_xlabel('X')
+        self.ax.set_ylabel('Y')
+        self.ax.set_zlabel('time')
+        #varNull = raw_input('Press enter to continue..')
         while not rospy.is_shutdown():
-            if self.hasdata:  
-                ax.cla()
-                ax.set_xlabel('X')
-                ax.set_ylabel('Y')
-                ax.set_zlabel('time')
-                ax.plot(xs=self.speed["X"],ys=self.speed["Y"],zs=self.time,label='movement curve')
-                self.hasdata = False
-            plt.show()
+            #plt.pause(0.05)
+            plt.draw()
+            #if self.hasdata:  
+            #    self.ax.cla()
+            #    self.ax.plot(xs=self.speed["X"],ys=self.speed["Y"],zs=self.time,label='movement curve')
+            #    self.hasdata = False
+            #plt.show()
             
 if __name__ == '__main__':
     My3DPlot().smooth_optitrack()
