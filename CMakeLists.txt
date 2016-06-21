@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(smooth_optitrack)
+project(surprise_optitrack)
 
 find_package(catkin REQUIRED COMPONENTS
   rospy 
@@ -43,12 +43,12 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-	DEPENDENCIES
-	std_msgs  # Or other packages containing msgs
-	hanp_msgs
-    optitrack_person
-)
+#generate_messages(
+#	DEPENDENCIES
+#	std_msgs  # Or other packages containing msgs
+#	hanp_msgs
+#    optitrack_person
+#)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -105,7 +105,7 @@ generate_messages(
 # add_dependencies(smooth_optitrack ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-# add_executable(smooth_optitrack_node src/smooth_optitrack_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above

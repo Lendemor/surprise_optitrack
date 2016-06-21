@@ -1,13 +1,12 @@
 <?xml version="1.0"?>
 <package>
-  <name>smooth_optitrack</name>
+  <name>surprise_optitrack</name>
   <version>0.0.0</version>
-  <description>The smooth_optitrack package</description>
+  <description>A package for detecting surprise from output of optitrack_person</description>
 
   <maintainer email="tbrandeh@laas.fr">tbrandeh</maintainer>
 
   <license>TODO</license>
-
 
   <!-- Url tags are optional, but mutiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
