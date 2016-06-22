@@ -6,21 +6,22 @@ Created on Mon Jun 20 17:17:59 2016
 """
 import numpy as np
 
-class DataTrack:
-    def __init__(self,name):
-        self.segment_name = name
-        self.time = np.array([])
-        self.pos = np.array([])
-        self.rel_pos = np.array([])
-        self.yaw = 
-    
-    def push_back_time(self,t):
-        self.time = np.append(self.time,t)
+class Vector:
+    def __init__(self):
+        self.values = np.array([])
         
-    def push_back_pos(self,p):
-        self.pos = np.append(self.pos,p)
-    
-    def push_back_rel_pos(self,rp):
-        self.rel_pos = np.append(self.rel_pos,rp)
+    def append(self,val):
+        self.values = np.append(self.values,val)
 
+    def __getitem__(self,index):
+        return self.values[index]
         
+    def __setitem__(self,index,value):
+    
+class DataTrack:
+    def __init__(self,seg_type):
+        self.segment_type = seg_type
+        self.pos = Vector()
+        self.rel_pos = Vector()
+        self.yaw = Vector()
+        self.rel_yaw = Vector()

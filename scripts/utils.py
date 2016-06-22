@@ -16,35 +16,26 @@ from time import sleep
 import math
 from tf.transformations import euler_from_quaternion,rotation_matrix
 
-from hanp_msgs.msg import TrackedHuman
-from hanp_msgs.msg import TrackedSegmentType
+#from hanp_msgs.msg import TrackedHuman
+from hanp_msgs.msg import TrackedSegmentType as t_segment
 
 def readbag(filename):
     bag = rosbag.Bag(filename)
-#    data = []
-    
-#    data.append([DataTrack("head"), DataTrack("torso")])
-    data = {'time':[],'P':[],'rP':[],'rS':[],'yaw':[],'ryaw':[],'syaw':[]}
+    data = {'time':Vector(),'head':DataTrack(t_segment.HEAD),'torso':DataTrack(t_segment.TORSO)}
     for topic, msg, t in bag.read_messages(topics=['/optitrack_person/tracked_persons']):
         if len(msg.humans) != 0:
-            if len(msg.humans[0].segments) != 0:
-                data['time'].append(msg.header.stamp.to_sec()) 
-                #data.push_back_time(msg.header.stamp.to_sec())
-                pos = np.array([msg.humans[0].segments[TrackedSegmentType.HEAD].pose.pose.position.x, msg.humans[0].segments[0].pose.pose.position.y, 0 , 0])
-                data['P'].append(pos)
-                     
-                ori = msg.humans[0].segments[0].pose.pose.orientation
-                yaw = euler_from_quaternion([ori.x, ori.y,ori.z,ori.w])[2]
-                data['yaw'].append(yaw)
+            data['time'].append(msg.header.stamp.to_sec())
+            for i in range(len(msg.humans)):
+                if len(msg.humans[i].segments) != 0:
+                    read_msg_from_segment(msg.humans[i].segments[t_segment.HEAD], data['head'])
+                    read_msg_from_segment(msg.humans[i].segments[t_segment.TORSO], data['torso'])
     bag.close()
     return data
 
-def read_msg_from_segment(msg, data, segment_type):
-    data.push_back_time(msg.header.stamp.to_sec())
-    data.push_back_pos(np.array([msg.humans[0].segments[segment_type].pose.pose.position.x, msg.humans[0].segments[segment_type].pose.pose.position.y, 0 , 0]))           
-    data.push_back_rel_pos()
-    
-    
+def read_data_from_segment(segment, data):
+    data.pos.append(np.array([segment.pose.pose.position.x, segment.pose.pose.position.y, 0 , 0]))        
+    ori = segment.pose.pose.orientation
+    data.yaw.append(euler_from_quaternion([ori.x, ori.y,ori.z,ori.w])[2])
 
 def process_relative_position(data):
     first_stamp = data['time'][0]
@@ -52,11 +43,17 @@ def process_relative_position(data):
     for i in range(1,len(data['time'])):
         data['time'][i] = data['time'][i] - first_stamp
         delta_time = data['time'][i] - data['time'][i-1]
-        r = rotation_matrix(data['yaw'][i-1],(0,0,1))
-        rel_pos = np.dot(np.linalg.inv(r),np.transpose(np.subtract(data['P'][i], data['P'][i-1])))
-        data['rP'].append(np.divide(rel_pos,delta_time))
+        
+        for k in data:
+            if k != 'time':
+                data[k].append_rel_pos(rel_pos(data[k].pos[i],data[k].pos[i-1],data[k].yaw[i-1]))
+
+#        r = rotation_matrix(data['yaw'][i-1],(0,0,1))
+ #       rel_pos = np.dot(np.linalg.inv(r),np.transpose(np.subtract(data['P'][i], data['P'][i-1])))
+  #      data['rP'].append(np.divide(rel_pos,delta_time))
+        
         yaw_vec = np.array([math.cos(data['yaw'][i]), math.sin(data['yaw'][i]), 0,0])
-        ryaw = math.asin(np.dot(np.linalg.inv(r),yaw_vec)[1]) 
+        ryaw = math.asin(np.dot(np.linalg.inv(r),yaw_vec)[1])
         data['ryaw'].append(ryaw/delta_time)
     data['rP'] = np.array(data['rP'])
     for i in range(0,2) :
@@ -66,7 +63,11 @@ def process_relative_position(data):
     data['ryaw'] = np.convolve(data['ryaw'],np.ones((15,))/15)[(14):]
     return data        
     
-def reltf()    
+def rel_pos(pos,last_pos,angle,delta):
+    return np.divide(np.dot(np.linalg.inv(rotation_matrix(angle,(0,0,1))),np.transpose(np.subtract(pos, last_pos))),delta)
+    
+def rel_yaw():
+    pass    
     
 def process_relative_speed(data):
     for i in range(1,len(data['time'])-1):
