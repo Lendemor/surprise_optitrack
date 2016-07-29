@@ -1,13 +1,13 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Jul 27 17:06:22 2016
 
-@author: tbrandeh
-"""
+import sys
 import rospy
+import std_msgs.msg
 from hanp_msgs.msg import TrackedHumans,TrackedHuman
 
 class RelativeOptitrack:
+    message_in = {}
     last_message_in = {}
     
     def __init__(self):
@@ -23,21 +23,18 @@ class RelativeOptitrack:
     def relative_callback(self,data):
         for i,human in enumerate(data.humans):
             if hasData(human):
-                d = (data.header,human)
-                print "receive :"
-#                print d
-                self.last_message_in[human.track_id] = d
+                self.message_in[human.track_id] = (data.header,human)
 #                
     def publishRelativePerson(self):
         msg = TrackedHumans()
-        msg.header = rospy.Time.now()
-        for (header,human) in self.last_message_in.values():
-            print header            
-            #
+        msg.header.stamp = rospy.Time.now()
+        print rospy.Time.now().to_sec()
+        for i in self.message_in:
+            (header,human) = self.message_in[i]
+            time = header.stamp.to_sec()
+           
             for j,segment in enumerate(human.segments):
-            #     print i
                 msg.humans.append(TrackedHuman())
-                print "plop"
                 
                 #print msg.humans[i]
                 #rospy.loginfo(rospy.get_caller_id() + ": I heard \n%s", human.track_id)
@@ -52,8 +49,8 @@ def hasData(human):
     return (len(human.segments) != 0)
 
 if __name__ == '__main__':
+    #print sys.argv[0]
     rospy.init_node('surprise_optitrack', anonymous=True)
-    
     rospy.logdebug(rospy.get_caller_id() + "Started surprise optitrack node.")
     relative = RelativeOptitrack()
     relative.start()
