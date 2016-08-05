@@ -3,17 +3,21 @@
 
 import sys
 import rospy
+import numpy as np
 import std_msgs.msg
-from hanp_msgs.msg import TrackedHumans,TrackedHuman
+from tf.transformations import euler_from_quaternion
+from hanp_msgs.msg import TrackedHumans,TrackedHuman, TrackedSegment
+from utils import frame_change
 
 class RelativeOptitrack:
     message_in = {}
-    last_message_in = {}
+    last_messages = {}
+    delta = 0
     
     def __init__(self):
         rospy.Subscriber("optitrack_person/tracked_persons", TrackedHumans, self.relative_callback)
-        self.rate = rospy.Rate(rospy.get_param("publish_rate"))
-        rospy.Publisher("relative_person/tracked_persons",TrackedHumans,queue_size = 15)
+        self.rate = rospy.Rate(1)#rospy.get_param("publish_rate"))
+        self.pub = rospy.Publisher("relative_person/tracked_persons",TrackedHumans,queue_size = 15)
 
     def start(self):
         while not rospy.is_shutdown():
@@ -23,27 +27,66 @@ class RelativeOptitrack:
     def relative_callback(self,data):
         for i,human in enumerate(data.humans):
             if hasData(human):
-                self.message_in[human.track_id] = (data.header,human)
+                self.message_in[human.track_id] = {}
+                for j,segment in enumerate(human.segments):
+                    self.message_in[human.track_id][segment.type] = (data.header,segment)
 #                
     def publishRelativePerson(self):
         msg = TrackedHumans()
         msg.header.stamp = rospy.Time.now()
-        print rospy.Time.now().to_sec()
-        for i in self.message_in:
-            (header,human) = self.message_in[i]
-            time = header.stamp.to_sec()
-           
-            for j,segment in enumerate(human.segments):
-                msg.humans.append(TrackedHuman())
-                
-                #print msg.humans[i]
-                #rospy.loginfo(rospy.get_caller_id() + ": I heard \n%s", human.track_id)
-        #    print len(self.messages)
-       # self.messages.append(msg)
-
+        time = msg.header.stamp.to_sec()
+        for i,human in self.message_in.items():
+            h = TrackedHuman()
+            h.track_id = i
+            for j,(header,segment) in human.items():                     
+                if self.last_messages.has_key(i):
+                    if self.last_messages[i].has_key(j):
+                        (last_header,last_segment) = self.last_messages[i][j]
+                        last_time = last_header.stamp.to_sec()
+                        if header.stamp.to_sec() != last_time:
+                            rel_segment = TrackedSegment()
+                            rel_segment.type = segment.type
+                            self.processDeltaTime(time,last_time)
+                            self.register_position(rel_segment,segment)
+                            # if last_message contains a segment here?
+                            self.process_relative_speed(rel_segment,segment,last_segment)
+                            self.process_relative_accel()
+                            h.segments.append(rel_segment)
+                            self.last_messages[i][j] = (msg.header,segment)
+                else:
+                    self.last_messages[i] = {}
+                    self.last_messages[i][j] = (msg.header,segment)#self.message_in[i][j]
+            msg.humans.append(h)
+        self.pub.publish(msg)
+    
+    def processDeltaTime(self,time,last_time):
+        self.delta = time - last_time
+    
+    def register_position(self,new_segment, segment_input):
+        new_segment.pose.pose.position = segment_input.pose.pose.position
+        new_segment.pose.pose.position.z = 0
+        new_segment.pose.pose.orientation = segment_input.pose.pose.orientation
         
-    def process_position():
-        pass
+    def process_relative_speed(self,new_segment, segment_input,last_segment):
+        pos      = np.array([segment_input.pose.pose.position.x,segment_input.pose.pose.position.y,0,0])
+        last_pos = np.array([last_segment.pose.pose.position.x,last_segment.pose.pose.position.y,0,0])
+        angle = euler_from_quaternion([segment_input.pose.pose.orientation.x, 
+                                       segment_input.pose.pose.orientation.y,
+                                       segment_input.pose.pose.orientation.z,
+                                       segment_input.pose.pose.orientation.w])[2]
+        last_angle = euler_from_quaternion([last_segment.pose.pose.orientation.x,
+                                            last_segment.pose.pose.orientation.y,
+                                            last_segment.pose.pose.orientation.z,
+                                            last_segment.pose.pose.orientation.w])[2]
+        [a,b] = frame_change(pos,last_pos,angle, last_angle, self.delta)
+        new_segment.twist.twist.linear.x = a[0]  #linear speed in direction of the person
+        new_segment.twist.twist.linear.y = a[1]  #lateral speed at perpendicular of direction of the person
+        new_segment.twist.twist.angular.y = b    #angular yaw speed
+    
+    def process_relative_accel(self,new_segment, segment_input,last_segment):
+        new_segment.accel.accel.linear.x = (segment_input.twist.twist.linear.x - last_segment.twist.twist.linear.x) / self.delta
+        new_segment.accel.accel.linear.y = (segment_input.twist.twist.linear.y - last_segment.twist.twist.linear.y) / self.delta
+        new_segment.accel.accel.angular.y = (segment_input.twist.twist.angular.y - last_segment.twist.twist.angular.y)/self.delta
     
 def hasData(human):
     return (len(human.segments) != 0)
@@ -54,4 +97,4 @@ if __name__ == '__main__':
     rospy.logdebug(rospy.get_caller_id() + "Started surprise optitrack node.")
     relative = RelativeOptitrack()
     relative.start()
-    rospy.spin()
+    #rospy.spin()

@@ -16,7 +16,7 @@ class SurpriseOptitrack:
 
     def surprise_callback(self,data):
         msg = TrackedHumans()
-        msg.header = data.header          
+        msg.header = data.header
         for i,human in enumerate(data.humans):
             if len(human.segments) != 0:
                 msg.humans.append(TrackedHuman())
@@ -27,7 +27,7 @@ class SurpriseOptitrack:
             print len(self.messages)
         self.messages.append(msg)
 
-        def process_
+   #     def process_
 
 
 if __name__ == '__main__':
