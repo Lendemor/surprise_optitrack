@@ -50,9 +50,11 @@ class RelativeOptitrack:
                             self.register_position(rel_segment,segment)
                             # if last_message contains a segment here?
                             self.process_relative_speed(rel_segment,segment,last_segment)
-                            self.process_relative_accel()
-                            h.segments.append(rel_segment)
-                            self.last_messages[i][j] = (msg.header,segment)
+                            if process_acc:
+                                self.process_relative_accel(rel_segment,segment,last_segment)
+                                h.segments.append(rel_segment)
+                                self.last_messages[i][j] = (msg.header,segment)
+                            self.process_acc = true                            
                 else:
                     self.last_messages[i] = {}
                     self.last_messages[i][j] = (msg.header,segment)#self.message_in[i][j]
