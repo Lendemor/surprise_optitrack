@@ -7,16 +7,20 @@ import numpy as np
 import std_msgs.msg
 from tf.transformations import euler_from_quaternion
 from hanp_msgs.msg import TrackedHumans,TrackedHuman, TrackedSegment
+from hanp_msgs.msg import TrackedSegmentType as t_segment
 from utils import frame_change
 
 class RelativeOptitrack:
     message_in = {}
     last_messages = {}
     delta = 0
+    process_acc = False
+    relative_to_torso = False
     
     def __init__(self):
         rospy.Subscriber("optitrack_person/tracked_persons", TrackedHumans, self.relative_callback)
         self.rate = rospy.Rate(1)#rospy.get_param("publish_rate"))
+        self.relative_to_torso = rospy.get_param("relative_to_torso")
         self.pub = rospy.Publisher("relative_person/tracked_persons",TrackedHumans,queue_size = 15)
 
     def start(self):
@@ -38,26 +42,28 @@ class RelativeOptitrack:
         for i,human in self.message_in.items():
             h = TrackedHuman()
             h.track_id = i
-            for j,(header,segment) in human.items():                     
+            for j,(header,segment) in human.items():
                 if self.last_messages.has_key(i):
                     if self.last_messages[i].has_key(j):
-                        (last_header,last_segment) = self.last_messages[i][j]
+                        if self.relative_to_torso:
+                            (last_header,last_segment) = self.last_messages[i][t_segment.TORSO]
+                        else:
+                            (last_header,last_segment) = self.last_messages[i][j]
                         last_time = last_header.stamp.to_sec()
                         if header.stamp.to_sec() != last_time:
                             rel_segment = TrackedSegment()
                             rel_segment.type = segment.type
                             self.processDeltaTime(time,last_time)
                             self.register_position(rel_segment,segment)
-                            # if last_message contains a segment here?
                             self.process_relative_speed(rel_segment,segment,last_segment)
-                            if process_acc:
+                            if self.process_acc:
                                 self.process_relative_accel(rel_segment,segment,last_segment)
                                 h.segments.append(rel_segment)
-                                self.last_messages[i][j] = (msg.header,segment)
-                            self.process_acc = true                            
+                            self.last_messages[i][j] = (msg.header,segment)
+                            self.process_acc = True                            
                 else:
                     self.last_messages[i] = {}
-                    self.last_messages[i][j] = (msg.header,segment)#self.message_in[i][j]
+                    self.last_messages[i][j] = (msg.header,segment)
             msg.humans.append(h)
         self.pub.publish(msg)
     
