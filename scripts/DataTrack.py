@@ -7,7 +7,7 @@ Created on Mon Jun 20 17:17:59 2016
 import numpy as np
 
 class Vector:
-    def __init__(self,):
+    def __init__(self):
         self.values = np.array([])
         
     def append(self,val):
