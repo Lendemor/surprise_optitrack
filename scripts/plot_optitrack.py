@@ -40,17 +40,17 @@ from DataTrack import Vector, DataTrack
 
 relative_topic = '/relative_person/tracked_persons'
 surprise_topic = '/surprise_person/tracked_persons'
+record_torso = False
 
 def readbag(filename):
     bag = rosbag.Bag(filename)
-#    print bag._get_yaml_info()    
+#    print bag._get_yaml_info()
     data = {}
     data[relative_topic] = Vector()
-    data[surprise_topic] = Vector()    
-    i = 0
+    data[surprise_topic] = Vector()
     for topic, msg, t in bag.read_messages(topics=[relative_topic,surprise_topic]):
         data[topic].append(msg.header.stamp.to_sec())
-        for human in msg.humans:          
+        for human in msg.humans:
             if not data.has_key(human.track_id):
                 data[human.track_id] = {}
             for segment in human.segments:
@@ -62,7 +62,7 @@ def readbag(filename):
                     data[human.track_id][segment.type].rel_yaw.append(segment.twist.twist.angular.y)
                     data[human.track_id][segment.type].rel_vel.append(np.array([segment.accel.accel.linear.x, segment.accel.accel.linear.y, 0 , 0]))
                     data[human.track_id][segment.type].rel_vel_yaw.append(segment.accel.accel.angular.y)
-                elif topic == surprise_topic:                    
+                elif topic == surprise_topic:
                     data[human.track_id][segment.type].var_vel.append(np.array([segment.twist.twist.linear.x, segment.twist.twist.linear.y, segment.twist.twist.angular.y , 0]))
     bag.close()
     return data
@@ -77,33 +77,35 @@ def plot_segment_track(relative_time,surprise_time,segment):
         suptitle = suptitle + 'Torso'
     fig.suptitle(suptitle, fontsize=14, fontweight='bold')
     ax = fig.add_subplot(311)
-    ax.set_ylabel('Speed (m/s)')
+    ax.set_ylabel('Frontal Speed (m/s)')
     ax.set_ylim(-3,3)
+    print len(surprise_time)
+    print len(segment.var_vel)
     ax.plot(relative_time,segment.rel_pos[:,0],'r')
-    ax.plot(relative_time,segment.rel_vel[:,0],'b')
+    #ax.plot(relative_time,segment.rel_vel[:,0],'b')
     ax.plot(relative_time,segment.rel_pos[:,3],'g')
     ax.plot(surprise_time,segment.var_vel[:,0],'c')
     ax = fig.add_subplot(312)
-    ax.set_ylabel('Speed/Acc')
+    ax.set_ylabel('Lateral Speed (m/s)')
     ax.set_ylim(-3,3)
     ax.plot(relative_time,segment.rel_pos[:,1],'r')
-    ax.plot(relative_time,segment.rel_vel[:,1],'b')
+    #ax.plot(relative_time,segment.rel_vel[:,1],'b')
     ax.plot(relative_time,segment.rel_pos[:,3],'g')
     ax.plot(surprise_time,segment.var_vel[:,1],'c')
     ax = fig.add_subplot(313)
     ax.set_xlabel('time(s)')
-    ax.set_ylabel('rad/s')
+    ax.set_ylabel('Radial speed (rad/s)')
     ax.set_ylim(-6,6)
     ax.plot(relative_time,segment.rel_yaw,'r')
-    ax.plot(relative_time,segment.rel_vel_yaw,'b')
+    #ax.plot(relative_time,segment.rel_vel_yaw,'b')
     ax.plot(relative_time,segment.rel_pos[:,3],'g')
     ax.plot(surprise_time,segment.var_vel[:,2],'c')
-    #if segment.segment_type == t_segment.TORSO:
-        #fig=plt.figure()
-        #fig.suptitle('Tracking of X/Y position over Time',fontsize=14, fontweight='bold')
-        #ax = fig.gca(projection='3d')
-        #ax.set_xlabel('X')
-        #ax.set_ylabel('Y')
+#    if segment.segment_type == t_segment.TORSO:
+#        fig=plt.figure()
+#        fig.suptitle('Tracking of X/Y position over Time',fontsize=14, fontweight='bold')
+#        ax = fig.gca(projection='3d')
+#        ax.set_xlabel('X')
+#        ax.set_ylabel('Y')
         #ax.set_ylim3d(-3,3)
         #ax.set_zlabel('time')
         #ax.plot(xs=segment.pos[:,0],ys=segment.pos[:,1],zs=time,label='movement curve', scalex = False)    
@@ -113,25 +115,23 @@ def plot_all_track(data):
         if i != relative_topic and i != surprise_topic :
             for j,segment in human.items():
                 plot_segment_track(data[relative_topic],data[surprise_topic],segment)
+                if j == t_segment.TORSO and record_torso:
+                    record3D(i,data[relative_topic],segment)
 
-def record3D(data):
-    myfile = open('torso3Ddata.csv','w')
-    header = "%time,pos.x,pos.y"
+def record3D(h_id,time,segment):
+    myfile = open('torso3Ddata.csv','w+')
+    header = "%track_id,time,pos.x,pos.y"
     myfile.write(header)
     myfile.write("\n")
-    for human in data:
-        pass
-#    for i in range(len(data[0]['torso'].pos)):
-#        row = "{},{},{}".format(data['time'][i],data[0]['torso'].pos[i][0],data[0]['torso'].pos[i][1])
-#        myfile.write(row)
-#        myfile.write("\n")
+    for i in range(len(time)):
+        row = "{},{},{},{}".format(h_id,time[i],segment.pos[i][0],segment.pos[i][1])
+        myfile.write(row)
+        myfile.write("\n")
     myfile.close()
     
 if __name__ == '__main__':
     data = readbag(sys.argv[1])
     record_torso = sys.argv[2]
-    if record_torso:
-        record3D(data)
     plot_all_track(data)
     plt.show()
     

@@ -36,11 +36,10 @@ class RelativeOptitrack:
                     self.message_in[human.track_id] = {}
                 for segment in human.segments:
                     self.message_in[human.track_id][segment.type] = (data.header,segment)
-                    
+    
     def publishRelativePerson(self):
         msg = TrackedHumans()
         msg.header.stamp = rospy.Time.now()
-        time = msg.header.stamp.to_sec()
         for i,human in self.message_in.items():
             h = TrackedHuman()
             h.track_id = i
@@ -51,20 +50,24 @@ class RelativeOptitrack:
                             (last_header,last_segment) = self.last_messages[i][t_segment.TORSO][-1]
                         else:
                             (last_header,last_segment) = self.last_messages[i][j][-1]
-                        last_time = last_header.stamp.to_sec()
-                        if header.stamp.to_sec() != last_time:
+                        self.processDeltaTime(header,last_header)
+                        if self.delta:
                             new_segment = TrackedSegment()
                             new_segment.type = segment.type
-                            self.processDeltaTime(time,last_time)
                             self.register_position(new_segment,segment)
                             self.process_relative_speed(new_segment,segment,last_segment)
                             self.last_messages[i][j].append((msg.header,new_segment))
                             if len(self.last_messages[i][j]) == self.size:
                                 self.average_speed(i,j)
-                                new_segment = self.last_messages[i][j][self.size/2][1]
-                                last_segment = self.last_messages[i][j][self.size/2-1][1]
+                                (new_header,new_segment) = self.last_messages[i][j][self.size/2]
+                                (last_header,last_segment) = self.last_messages[i][j][self.size/2-1]
+                                self.processDeltaTime(new_header,last_header)
                                 self.process_relative_accel(new_segment,new_segment,last_segment)
+                                msg.header = new_header
                                 h.segments.append(new_segment)
+                    else:
+                        self.last_messages[i][j] = deque(maxlen=self.size)
+                        self.last_messages[i][j].append((msg.header,segment))
                 else:
                     self.last_messages[i] = {}
                     self.last_messages[i][j] = deque(maxlen=self.size)
@@ -72,8 +75,8 @@ class RelativeOptitrack:
             msg.humans.append(h)
         self.pub.publish(msg)
     
-    def processDeltaTime(self,time,last_time):
-        self.delta = time - last_time
+    def processDeltaTime(self,header,last_header):
+        self.delta = header.stamp.to_sec() - last_header.stamp.to_sec()
     
     def register_position(self,new_segment, segment_input):
         new_segment.pose.pose.position = segment_input.pose.pose.position

@@ -8,13 +8,12 @@ from utils import hasData
 from hanp_msgs.msg import TrackedHumans,TrackedHuman,TrackedSegment
 from hanp_msgs.msg import TrackedSegmentType as t_segment
 
-threshold = {t_segment.HEAD:[0.45,0.35],t_segment.TORSO:[0.5,0.75]}
+threshold = {t_segment.HEAD:[0.45,1],t_segment.TORSO:[0.5,0.75]}
 
 class SurpriseOptitrack:
     message_in = {}
     last_messages = {}
     update_map={}
-    size = 0
     
     def __init__(self):
         self.size = rospy.get_param("size_filter",15)
@@ -31,17 +30,24 @@ class SurpriseOptitrack:
     def surprise_callback(self,data):
         for human in data.humans:
             if hasData(human):
-                if not self.message_in.has_key(human.track_id):      
+                if not self.message_in.has_key(human.track_id):
                     self.message_in[human.track_id] = {}
                 for segment in human.segments:
-                    if not self.message_in[human.track_id].has_key(segment.type):
-                        self.message_in[human.track_id][segment.type] = deque(maxlen=self.size)
-                    self.message_in[human.track_id][segment.type].append((data.header,segment))
+#                    if not self.message_in[human.track_id].has_key(segment.type):
+ #                       self.message_in[human.track_id][segment.type] = deque(maxlen=self.size)
+                    self.message_in[human.track_id][segment.type] = (data.header,segment)
                     
     def publishSurprisePerson(self):
         msg = TrackedHumans()
         msg.header.stamp = rospy.Time.now()
         for i,human in self.message_in.items():
+            if not self.last_messages.has_key(i):
+                self.last_messages[i] = {}
+            for j,elem in human.items():
+                if not self.last_messages[i].has_key(j):
+                    self.last_messages[i][j] = deque(maxlen=self.size)
+                self.last_messages[i][j].append(elem)
+        for i,human in self.last_messages.items():
             h = TrackedHuman()
             h.track_id = i
             for j,vector in human.items():
